@@ -10,6 +10,7 @@ CREATE TABLE transform_rules (
   category_ids INT[] DEFAULT NULL,
   mime_type_ids INT[] DEFAULT NULL,
   transform_config JSONB NOT NULL,
+  output_path TEXT DEFAULT NULL,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -17,13 +18,18 @@ CREATE TABLE transform_rules (
 - Example transform_config
 ```
 {
-  "thumbnail": { "width": 200, "height": 200 },
-  "rounded": { "radius": "50%" }
-}
+  "property":
+    {
+     "width": 200,
+     "height": 200,
+     "object-fit": "cover"
+    },
+  "replace_original": false
+}   
 ```
 #### Notes
  - topic_patterns: list of topic patterns to match.
- - category_ids and mime_type_ids: may be empty if the rule applies to all types.
+ - category_ids and mime_type_ids: may be null or [] if the rule applies to all types.
  - transform_config: stores the JSON configuration for transformations (resize, optimize, chaining, etc.).
 
 
@@ -34,43 +40,47 @@ INSERT INTO transform_rules (
   topic_patterns,
   category_ids,
   mime_type_ids,
-  transform_config
+  transform_config,
+  output_path
 )
 VALUES
 (
-  ARRAY['admin/users/%/photo'],
+  ARRAY['bec/projects/*', 'bec/products/*'],
   ARRAY[1],
-  ARRAY[1, 2],
+  ARRAY[14, 15, 16, 17, 18, 26],
   '{
-    "thumbnail": { "width": 200, "height": 200 },
-    "optimize": true
-  }'::jsonb
+     "property":
+        {
+         "width": 200,
+         "height": 200,
+         "object-fit": "cover"
+        },
+      "replace_original": false
+  }'::jsonb,
+  "thumbnail/"
 );
 
 ```
 
-### Create Queue service
-- Acts as the bridge between the backend and Cloud Run.
+### Create Queue service using Cloud Tasks
+- Create a task for the endpoint "file/transform" (endpoint of Cloud Run to handle transform img)
 
-The backend publishes a message to Pub/Sub after identifying a file that matches a transformation rule.
-
-- Pub/Sub Topic: **file-transform**
-
-- Message structure
+- Payload structure example
 ```
 {
-  "bucket": "boueki-cloud-files",
-  "file_path": "admin/users/123/photo/avatar.png",
-  "mime_type": "image/png",
+  "bucket": "file-service-bucket", // Bucket in file service
+  "filePath": "/files/final/UkLWZg9D/UkLWZg9D.png",
+  "download": "https://storage.googleapis.com/local-datnt-upload/files/final/UkLWZg9D/UkLWZg9D.png",
   "transform_config": {
-    "thumbnail": { "width": 200, "height": 200 },
-    "optimize": true
+     "property":
+        {
+         "width": 200,
+         "height": 200,
+         "object-fit": "cover"
+        },
+      "replace_original": false
   },
-  "output_path": {
-    "thumbnail": "thumbnail/",
-    "rounded": "rounded/"
-  },
-  "requested_by": "backend",
+  "output_path": "thumbnail/",
   "created_at": "2025-10-07T12:00:00Z"
 }
 
@@ -99,4 +109,5 @@ The backend publishes a message to Pub/Sub after identifying a file that matches
 | **Rounded**   | `rounded/`   | `rounded/admin/users/123/photo/avatar.png`   |
 
 
-### Backfill old data
+### Backfill old data plan
+- 
